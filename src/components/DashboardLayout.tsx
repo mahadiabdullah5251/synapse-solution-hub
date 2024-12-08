@@ -1,18 +1,30 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupLabel } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, BarChart2, Settings, LogOut, Workflow } from "lucide-react";
 import DashboardOverview from "./DashboardOverview";
+import Analytics from "@/pages/Analytics";
+import Workflows from "@/pages/Workflows";
+import SettingsPage from "@/pages/Settings";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState("overview");
+  const location = useLocation();
+  const [activeView, setActiveView] = useState(() => {
+    const path = location.pathname.slice(1) || "overview";
+    return path;
+  });
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate("/");
+  };
+
+  const handleNavigation = (path: string) => {
+    setActiveView(path);
+    navigate(path === "overview" ? "/" : `/${path}`);
   };
 
   const menuItems = [
@@ -38,7 +50,7 @@ export default function DashboardLayout() {
                 {menuItems.map((item) => (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
-                      onClick={() => setActiveView(item.id)}
+                      onClick={() => handleNavigation(item.id)}
                       isActive={activeView === item.id}
                     >
                       <item.icon className="w-4 h-4" />
@@ -62,7 +74,9 @@ export default function DashboardLayout() {
         </Sidebar>
         <main className="flex-1 p-6">
           {activeView === "overview" && <DashboardOverview />}
-          {/* Other views will be implemented in subsequent updates */}
+          {activeView === "analytics" && <Analytics />}
+          {activeView === "workflows" && <Workflows />}
+          {activeView === "settings" && <SettingsPage />}
         </main>
       </div>
     </SidebarProvider>
