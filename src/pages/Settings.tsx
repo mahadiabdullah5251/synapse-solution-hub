@@ -28,8 +28,8 @@ export default function Settings() {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const updates = {
-      full_name: formData.get("fullName"),
-      company_name: formData.get("companyName"),
+      full_name: String(formData.get("fullName") || ""),
+      company_name: String(formData.get("companyName") || ""),
     };
 
     const { error } = await supabase
