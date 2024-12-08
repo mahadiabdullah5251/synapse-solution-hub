@@ -9,24 +9,36 @@ import UseCases from "@/components/UseCases";
 import Pricing from "@/components/Pricing";
 import Footer from "@/components/Footer";
 import DashboardLayout from "@/components/DashboardLayout";
+import { toast } from "sonner";
 
 export default function Index() {
   const [session, setSession] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Check for initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) {
+        toast.success("Successfully logged in!");
+      }
     });
 
+    // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
+      if (session) {
+        // Ensure we're on the root path after successful login
+        if (window.location.hash.includes('access_token')) {
+          navigate('/');
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   if (!session) {
     return (
@@ -54,6 +66,7 @@ export default function Index() {
               view="sign_in"
               showLinks={true}
               socialLayout="vertical"
+              redirectTo={window.location.origin}
             />
           </div>
         </div>
