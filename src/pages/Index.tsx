@@ -50,7 +50,10 @@ export default function Index() {
                   },
                 },
               }}
-              providers={[]}
+              providers={["google"]}
+              view="sign_in"
+              showLinks={true}
+              socialLayout="vertical"
             />
           </div>
         </div>
