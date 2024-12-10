@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import Features from "@/components/Features";
@@ -10,15 +10,21 @@ import Pricing from "@/components/Pricing";
 import Footer from "@/components/Footer";
 import DashboardLayout from "@/components/DashboardLayout";
 import { toast } from "sonner";
+import { Loader } from "lucide-react";
 
 export default function Index() {
   const [session, setSession] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
+    console.log("Index component mounted");
     // Check for initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Session check completed", session);
       setSession(session);
+      setIsLoading(false);
       if (session) {
         toast.success("Successfully logged in!");
       }
@@ -28,6 +34,7 @@ export default function Index() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log("Auth state changed", session);
       setSession(session);
       if (session) {
         // Ensure we're on the root path after successful login
@@ -39,6 +46,14 @@ export default function Index() {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-purple-50">
+        <Loader className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!session) {
     return (
