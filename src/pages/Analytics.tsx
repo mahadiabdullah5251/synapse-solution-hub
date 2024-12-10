@@ -46,6 +46,16 @@ export default function Analytics() {
     );
   }
 
+  const chartConfig = {
+    metric: {
+      label: "Metric Value",
+      theme: {
+        light: "hsl(var(--primary))",
+        dark: "hsl(var(--primary))",
+      },
+    },
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -61,7 +71,7 @@ export default function Analytics() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            <ChartContainer>
+            <ChartContainer config={chartConfig}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={analyticsData}>
                   <XAxis dataKey="projects.name" />
