@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -9,42 +9,63 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Settings() {
-  const { data: profile, isLoading, refetch } = useQuery({
+  const queryClient = useQueryClient();
+
+  const { data: profile, isLoading, error } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user?.id)
+        .eq("id", user.id)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        toast.error("Failed to fetch profile");
+        throw error;
+      }
       return data;
     },
   });
 
-  const updateProfile = async (event: React.FormEvent<HTMLFormElement>) => {
+  const updateProfileMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const updates = {
+        full_name: String(formData.get("fullName") || ""),
+        company_name: String(formData.get("companyName") || ""),
+      };
+
+      const { error } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Profile updated successfully");
+    },
+    onError: () => {
+      toast.error("Failed to update profile");
+    },
+  });
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const updates = {
-      full_name: String(formData.get("fullName") || ""),
-      company_name: String(formData.get("companyName") || ""),
-    };
-
-    const { error } = await supabase
-      .from("profiles")
-      .update(updates)
-      .eq("id", profile?.id);
-
-    if (error) {
-      toast.error("Failed to update profile");
-      return;
-    }
-
-    toast.success("Profile updated successfully");
-    refetch();
+    updateProfileMutation.mutate(formData);
   };
+
+  if (error) {
+    return <div>Error loading profile</div>;
+  }
 
   if (isLoading) {
     return (
@@ -69,7 +90,7 @@ export default function Settings() {
           <CardTitle>Profile Settings</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={updateProfile} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
               <Input
@@ -96,7 +117,12 @@ export default function Settings() {
                 disabled
               />
             </div>
-            <Button type="submit">Save Changes</Button>
+            <Button 
+              type="submit"
+              disabled={updateProfileMutation.isPending}
+            >
+              {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
           </form>
         </CardContent>
       </Card>

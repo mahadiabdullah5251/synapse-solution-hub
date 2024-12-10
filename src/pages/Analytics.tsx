@@ -2,22 +2,40 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { ChartContainer } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 export default function Analytics() {
-  const { data: analyticsData, isLoading } = useQuery({
+  const { data: analyticsData, isLoading, error } = useQuery({
     queryKey: ["analytics"],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
       const { data, error } = await supabase
         .from("analytics_data")
-        .select(`*, projects(name)`);
+        .select(`
+          *,
+          projects (
+            name,
+            description
+          )
+        `)
+        .order('timestamp', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        toast.error("Failed to fetch analytics data");
+        throw error;
+      }
       return data;
     },
   });
+
+  if (error) {
+    return <div>Error loading analytics data</div>;
+  }
 
   if (isLoading) {
     return (
@@ -43,31 +61,12 @@ export default function Analytics() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            <ChartContainer
-              config={{
-                performance: {
-                  theme: {
-                    light: "hsl(217.2, 91.2%, 59.8%)",
-                    dark: "hsl(217.2, 91.2%, 59.8%)",
-                  },
-                },
-              }}
-            >
+            <ChartContainer>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={analyticsData}>
                   <XAxis dataKey="projects.name" />
                   <YAxis />
-                  <Tooltip content={({ active, payload }) => {
-                    if (!active || !payload) return null;
-                    return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="font-medium">{payload[0]?.payload?.projects?.name}</div>
-                          <div className="font-medium">{payload[0]?.value}</div>
-                        </div>
-                      </div>
-                    );
-                  }} />
+                  <Tooltip />
                   <Bar
                     dataKey="metric_value"
                     fill="currentColor"

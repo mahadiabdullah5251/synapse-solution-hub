@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,32 +8,54 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
 export default function Workflows() {
-  const { data: workflows, isLoading, refetch } = useQuery({
+  const queryClient = useQueryClient();
+
+  const { data: workflows, isLoading, error } = useQuery({
     queryKey: ["workflows"],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
       const { data, error } = await supabase
         .from("workflows")
-        .select(`*, projects(name)`);
+        .select(`
+          *,
+          projects (
+            name,
+            description
+          )
+        `)
+        .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        toast.error("Failed to fetch workflows");
+        throw error;
+      }
       return data;
     },
   });
 
-  const toggleWorkflow = async (id: string, currentState: boolean) => {
-    const { error } = await supabase
-      .from("workflows")
-      .update({ is_active: !currentState })
-      .eq("id", id);
+  const toggleWorkflowMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const { error } = await supabase
+        .from("workflows")
+        .update({ is_active: !isActive })
+        .eq("id", id);
 
-    if (error) {
-      toast.error("Failed to update workflow status");
-      return;
-    }
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      toast.success("Workflow updated successfully");
+    },
+    onError: () => {
+      toast.error("Failed to update workflow");
+    },
+  });
 
-    toast.success("Workflow status updated");
-    refetch();
-  };
+  if (error) {
+    return <div>Error loading workflows</div>;
+  }
 
   if (isLoading) {
     return (
@@ -62,7 +84,12 @@ export default function Workflows() {
               </CardTitle>
               <Switch
                 checked={workflow.is_active}
-                onCheckedChange={() => toggleWorkflow(workflow.id, workflow.is_active)}
+                onCheckedChange={() => 
+                  toggleWorkflowMutation.mutate({
+                    id: workflow.id,
+                    isActive: workflow.is_active
+                  })
+                }
               />
             </CardHeader>
             <CardContent>
