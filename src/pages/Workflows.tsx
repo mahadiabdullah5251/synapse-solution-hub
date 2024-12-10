@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { PlayCircle } from "lucide-react";
 
 export default function Workflows() {
   const queryClient = useQueryClient();
@@ -53,6 +55,23 @@ export default function Workflows() {
     },
   });
 
+  const executeWorkflowMutation = useMutation({
+    mutationFn: async (workflowId: string) => {
+      const { data, error } = await supabase.functions.invoke('execute-workflow', {
+        body: { workflowId }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Workflow executed successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to execute workflow: ${error.message}`);
+    },
+  });
+
   if (error) {
     return <div>Error loading workflows</div>;
   }
@@ -96,11 +115,21 @@ export default function Workflows() {
               <p className="text-sm text-muted-foreground mb-4">
                 {workflow.description}
               </p>
-              <div className="flex items-center space-x-2">
-                <Badge variant={workflow.is_active ? "default" : "secondary"}>
-                  {workflow.is_active ? "Active" : "Inactive"}
-                </Badge>
-                <Badge variant="outline">{workflow.projects?.name}</Badge>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Badge variant={workflow.is_active ? "default" : "secondary"}>
+                    {workflow.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                  <Badge variant="outline">{workflow.projects?.name}</Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => executeWorkflowMutation.mutate(workflow.id)}
+                  disabled={!workflow.is_active}
+                >
+                  <PlayCircle className="h-4 w-4" />
+                </Button>
               </div>
             </CardContent>
           </Card>
