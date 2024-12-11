@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { Database } from '@/integrations/supabase/types/database.types'
+
+type Subscription = Database['public']['Tables']['subscriptions']['Row']
 
 export function useSubscription() {
   const [isLoading, setIsLoading] = useState(false)
@@ -16,10 +19,11 @@ export function useSubscription() {
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
+        .eq('user_id', session.user.id)
         .single()
 
       if (error) throw error
-      return data
+      return data as Subscription
     },
   })
 
