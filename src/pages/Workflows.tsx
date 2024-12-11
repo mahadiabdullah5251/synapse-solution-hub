@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,15 +8,30 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { PlayCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function Workflows() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/");
+        return;
+      }
+    };
+    checkAuth();
+  }, [navigate]);
 
   const { data: workflows, isLoading, error } = useQuery({
     queryKey: ["workflows"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+
+      console.log("Fetching workflows for user:", user.id);
 
       const { data, error } = await supabase
         .from("workflows")
@@ -30,15 +45,17 @@ export default function Workflows() {
         .order('created_at', { ascending: false });
       
       if (error) {
-        toast.error("Failed to fetch workflows");
+        console.error("Error fetching workflows:", error);
         throw error;
       }
+      console.log("Fetched workflows:", data);
       return data;
     },
   });
 
   const toggleWorkflowMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      console.log("Toggling workflow:", id, "to", !isActive);
       const { error } = await supabase
         .from("workflows")
         .update({ is_active: !isActive })
@@ -50,13 +67,15 @@ export default function Workflows() {
       queryClient.invalidateQueries({ queryKey: ["workflows"] });
       toast.success("Workflow updated successfully");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error toggling workflow:", error);
       toast.error("Failed to update workflow");
     },
   });
 
   const executeWorkflowMutation = useMutation({
     mutationFn: async (workflowId: string) => {
+      console.log("Executing workflow:", workflowId);
       const { data, error } = await supabase.functions.invoke('execute-workflow', {
         body: { workflowId }
       });
@@ -68,6 +87,7 @@ export default function Workflows() {
       toast.success("Workflow executed successfully");
     },
     onError: (error) => {
+      console.error("Error executing workflow:", error);
       toast.error(`Failed to execute workflow: ${error.message}`);
     },
   });

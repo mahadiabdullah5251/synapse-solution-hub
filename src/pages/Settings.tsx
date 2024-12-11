@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,12 +17,22 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/");
+        return;
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
   const { data: profile, isLoading, error } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        navigate("/");
         throw new Error("Not authenticated");
       }
 
@@ -33,7 +43,7 @@ export default function Settings() {
         .single();
       
       if (error) {
-        toast.error("Failed to fetch profile");
+        console.error("Error fetching profile:", error);
         throw error;
       }
       return data;
@@ -61,7 +71,8 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Profile updated successfully");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error updating profile:", error);
       toast.error("Failed to update profile");
     },
   });
@@ -95,6 +106,7 @@ export default function Settings() {
   };
 
   if (error) {
+    console.error("Profile error:", error);
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
