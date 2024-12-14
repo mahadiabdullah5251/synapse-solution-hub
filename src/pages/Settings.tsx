@@ -21,6 +21,8 @@ export default function Settings() {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        console.log("No session found in Settings");
+        toast.error("Please sign in to access settings");
         navigate("/");
         return;
       }
@@ -31,15 +33,15 @@ export default function Settings() {
   const { data: profile, isLoading, error } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         throw new Error("Not authenticated");
       }
 
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("id", session.user.id)
         .single();
       
       if (error) {
@@ -48,12 +50,13 @@ export default function Settings() {
       }
       return data;
     },
+    retry: 1,
   });
 
   const updateProfileMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
 
       const updates = {
         full_name: String(formData.get("fullName") || ""),
@@ -63,7 +66,7 @@ export default function Settings() {
       const { error } = await supabase
         .from("profiles")
         .update(updates)
-        .eq("id", user.id);
+        .eq("id", session.user.id);
 
       if (error) throw error;
     },
@@ -84,11 +87,15 @@ export default function Settings() {
   };
 
   const handlePasswordReset = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.email) {
+      toast.error("No email found for password reset");
+      return;
+    }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email);
+    const { error } = await supabase.auth.resetPasswordForEmail(session.user.email);
     if (error) {
+      console.error("Password reset error:", error);
       toast.error("Failed to send password reset email");
     } else {
       toast.success("Password reset email sent");
@@ -98,6 +105,7 @@ export default function Settings() {
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
+      console.error("Sign out error:", error);
       toast.error("Failed to sign out");
     } else {
       toast.success("Signed out successfully");
