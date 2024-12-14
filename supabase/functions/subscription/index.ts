@@ -14,6 +14,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('Subscription function called with method:', req.method)
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -21,16 +23,24 @@ Deno.serve(async (req) => {
 
     // Get the request body
     const { action, planId, featureName } = await req.json() as SubscriptionRequest
+    console.log('Request payload:', { action, planId, featureName })
 
     // Get the user from the authorization header
     const authHeader = req.headers.get('Authorization')?.split('Bearer ')[1]
-    if (!authHeader) throw new Error('No authorization header')
+    if (!authHeader) {
+      console.error('No authorization header provided')
+      throw new Error('No authorization header')
+    }
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader)
-    if (userError || !user) throw new Error('Error getting user')
+    if (userError || !user) {
+      console.error('Error getting user:', userError)
+      throw new Error('Error getting user')
+    }
+
+    console.log('Processing request for user:', user.id)
 
     let result;
-
     switch (action) {
       case 'create':
         result = await handleSubscriptionCreate(supabaseClient, user.id, planId!)
@@ -47,6 +57,8 @@ Deno.serve(async (req) => {
       default:
         throw new Error('Invalid action')
     }
+
+    console.log('Operation completed successfully:', result)
 
     return new Response(
       JSON.stringify(result),
